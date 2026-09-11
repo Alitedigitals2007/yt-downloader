@@ -98,6 +98,9 @@
     .empty { color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
     #mp3Btn { width: 100%; margin-bottom: 24px; }
     .note { color: var(--muted); font-size: 0.78rem; margin-top: 32px; line-height: 1.6; }
+    .credit { margin-top: 28px; text-align: center; color: var(--muted); font-size: 0.8rem; }
+    .credit a { color: var(--accent); text-decoration: none; }
+    .credit a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -138,8 +141,12 @@
     <p class="note">
       Video and audio are downloaded directly from YouTube, so they never touch this server.
       The MP3 option is converted with FFmpeg in a temporary folder that is deleted as soon as the
-      response is sent. Only download content you have the right to download.
+      response is sent. Only download content you have       the right to download.
     </p>
+
+    <footer class="credit">
+      Made by <a href="https://myalite.vercel.app" target="_blank" rel="noopener">Alite</a>
+    </footer>
   </main>
 
   <script>
