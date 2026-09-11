@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Downloader</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e1116;
+      --panel: #161b22;
+      --border: #2a313c;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2f81f7;
+      --accent-hover: #1f6feb;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    main { width: 100%; max-width: 720px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; font-size: 0.9rem; }
+    form { display: flex; gap: 8px; }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.6; cursor: default; }
+    #status { margin-top: 16px; font-size: 0.9rem; min-height: 20px; }
+    #status.error { color: var(--danger); }
+    #status.loading { color: var(--muted); }
+    #result { display: none; margin-top: 24px; }
+    .meta { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
+    .meta img { width: 140px; border-radius: 8px; flex-shrink: 0; }
+    .meta h2 { font-size: 1.1rem; margin: 0 0 6px; }
+    .meta p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+    section { margin-bottom: 28px; }
+    section h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      margin-bottom: 8px;
+    }
+    .info { display: flex; flex-direction: column; gap: 2px; }
+    .name { font-weight: 600; font-size: 0.95rem; }
+    .detail { color: var(--muted); font-size: 0.8rem; }
+    a.dl {
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    a.dl:hover { background: var(--accent-hover); }
+    .empty { color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
+    #mp3Btn { width: 100%; margin-bottom: 24px; }
+    .note { color: var(--muted); font-size: 0.78rem; margin-top: 32px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>YouTube Downloader</h1>
+    <p class="sub">Video and audio download directly. MP3 is converted on the fly, then deleted.</p>
+
+    <form id="form">
+      <input id="url" type="text" placeholder="Paste a YouTube link" autocomplete="off" />
+      <button id="submit" type="submit">Get formats</button>
+    </form>
+
+    <div id="status"></div>
+
+    <div id="result">
+      <div class="meta">
+        <img id="thumb" alt="" />
+        <div>
+          <h2 id="title"></h2>
+          <p id="channel"></p>
+          <p id="length"></p>
+        </div>
+      </div>
+
+      <button id="mp3Btn" type="button">Convert &amp; download MP3 (192 kbps)</button>
+
+      <section>
+        <h3>Video (with sound)</h3>
+        <ul id="video"></ul>
+      </section>
+
+      <section>
+        <h3>Audio (original format)</h3>
+        <ul id="audio"></ul>
+      </section>
+    </div>
+
+    <p class="note">
+      Video and audio are downloaded directly from YouTube, so they never touch this server.
+      The MP3 option is converted with FFmpeg in a temporary folder that is deleted as soon as the
+      response is sent. Only download content you have the right to download.
+    </p>
+  </main>
+
+  <script>
+    const form = document.getElementById("form");
+    const urlInput = document.getElementById("url");
+    const submitBtn = document.getElementById("submit");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+
+    function setStatus(message, type) {
+      status.textContent = message || "";
+      status.className = type || "";
+    }
+
+    function formatDuration(seconds) {
+      if (!seconds) return "";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      const pad = (n) => String(n).padStart(2, "0");
+      return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+    }
+
+    function renderList(target, items, kind) {
+      target.innerHTML = "";
+      if (!items || items.length === 0) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = kind === "video"
+          ? "No single-file video (with sound) is available. Higher qualities need merging, which this app does not do."
+          : "No audio stream is available for this video.";
+        target.appendChild(li);
+        return;
+      }
+      items.forEach((item) => {
+        const li = document.createElement("li");
+
+        const info = document.createElement("div");
+        info.className = "info";
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = item.label + (item.ext ? ` \u00b7 ${item.ext}` : "");
+        const detail = document.createElement("span");
+        detail.className = "detail";
+        const parts = [];
+        if (kind === "video" && item.fps) parts.push(`${item.fps} fps`);
+        if (item.size) parts.push(item.size);
+        detail.textContent = parts.join(" \u00b7 ") || "size unknown";
+        info.appendChild(name);
+        info.appendChild(detail);
+
+        const link = document.createElement("a");
+        link.className = "dl";
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = "Download";
+
+        li.appendChild(info);
+        li.appendChild(link);
+        target.appendChild(li);
+      });
+    }
+
+    const mp3Btn = document.getElementById("mp3Btn");
+
+    mp3Btn.addEventListener("click", async () => {
+      const url = urlInput.value.trim();
+      if (!url) {
+        setStatus("Paste a YouTube link first.", "error");
+        return;
+      }
+
+      mp3Btn.disabled = true;
+      setStatus("Converting to MP3... this can take a moment.", "loading");
+
+      try {
+        const response = await fetch("/api/mp3", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          setStatus(data.error || "Could not create the MP3.", "error");
+          return;
+        }
+
+        const blob = await response.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "audio.mp3";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        setStatus("MP3 ready.", "");
+      } catch (err) {
+        setStatus("Could not reach the server.", "error");
+      } finally {
+        mp3Btn.disabled = false;
+      }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const url = urlInput.value.trim();
+      if (!url) {
+        setStatus("Paste a YouTube link first.", "error");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      result.style.display = "none";
+      setStatus("Reading video...", "loading");
+
+      try {
+        const response = await fetch("/api/formats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          setStatus(data.error || "Something went wrong.", "error");
+          return;
+        }
+
+        document.getElementById("thumb").src = data.thumbnail || "";
+        document.getElementById("title").textContent = data.title || "Untitled";
+        document.getElementById("channel").textContent = data.uploader || "";
+        const duration = formatDuration(data.duration);
+        document.getElementById("length").textContent = duration ? `Length: ${duration}` : "";
+
+        renderList(document.getElementById("video"), data.video, "video");
+        renderList(document.getElementById("audio"), data.audio, "audio");
+
+        setStatus("");
+        result.style.display = "block";
+      } catch (err) {
+        setStatus("Could not reach the server.", "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

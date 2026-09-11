@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "functions": {
+    "api/formats.py": {
+      "maxDuration": 60
+    }
+  }
+}
